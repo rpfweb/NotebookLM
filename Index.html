@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Potencializando o ensino com o NotebookLM</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            900: '#0c4a6e',
+                        },
+                        dark: {
+                            bg: '#0f172a',
+                            surface: '#1e293b',
+                            border: '#334155'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Custom Styles & Glassmorphism - ALTO CONTRASTE */
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.95);
+            --glass-border: rgba(203, 213, 225, 0.8);
+            --text-main: #0f172a;
+            --text-muted: #334155;
+        }
+
+        .dark {
+            --glass-bg: rgba(15, 23, 42, 0.95);
+            --glass-border: rgba(51, 65, 85, 0.8);
+            --text-main: #f8fafc;
+            --text-muted: #e2e8f0;
+        }
+
+        body {
+            background-color: #f1f5f9;
+            color: var(--text-main);
+            transition: background-color 0.3s, color 0.3s;
+            overflow-x: hidden;
+        }
+
+        .dark body {
+            background-color: var(--dark-bg);
+            background-image: radial-gradient(circle at 15% 50%, rgba(14, 165, 233, 0.05), transparent 25%),
+                              radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.05), transparent 25%);
+        }
+
+        /* Glassmorphism Classes */
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 1rem;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .glass-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+
+        /* Animations */
+        .fade-in-up {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+        }
+        .fade-in-up.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Timeline specific */
+        .timeline-line {
+            position: absolute;
+            left: 15px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #cbd5e1;
+            z-index: 0;
+        }
+        .dark .timeline-line { background: #475569; }
+        
+        .timeline-dot {
+            position: relative;
+            z-index: 1;
+            background: #fff;
+        }
+        .dark .timeline-dot { background: var(--dark-surface); }
+
+        /* Active Sidebar Link */
+        .nav-link.active {
+            background-color: rgba(14, 165, 233, 0.1);
+            color: #0ea5e9;
+            border-right: 3px solid #0ea5e9;
+        }
+        .dark .nav-link.active {
+            background-color: rgba(14, 165, 233, 0.2);
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Sidebar Navigation -->
+    <aside class="fixed top-0 left-0 h-screen w-64 glass border-r z-50 hidden md:flex flex-col transition-transform duration-300">
+        <div class="p-6">
+            <h1 class="text-xl font-serif font-bold text-brand-600 dark:text-brand-500 leading-tight">
+                Workshop<br><span class="text-sm font-sans font-normal text-slate-500 dark:text-slate-400">EdTech & IA</span>
+            </h1>
+        </div>
+        
+        <nav class="flex-1 overflow-y-auto py-4" id="sidebar-nav">
+            <ul class="space-y-1">
+                <li><a href="#hero" class="nav-link flex items-center px-6 py-3 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><i data-lucide="home" class="w-4 h-4 mr-3"></i> Início</a></li>
+                <li><a href="#agenda" class="nav-link flex items-center px-6 py-3 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><i data-lucide="clock" class="w-4 h-4 mr-3"></i> Agenda</a></li>
+                <li><a href="#inovacao" class="nav-link flex items-center px-6 py-3 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><i data-lucide="lightbulb" class="w-4 h-4 mr-3"></i> Inovação Pedagógica</a></li>
+                <li><a href="#notebooklm" class="nav-link flex items-center px-6 py-3 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><i data-lucide="bot" class="w-4 h-4 mr-3"></i> Experiência NotebookLM</a></li>
+                <li><a href="#resultados" class="nav-link flex items-center px-6 py-3 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><i data-lucide="bar-chart-2" class="w-4 h-4 mr-3"></i> Resultados Analíticos</a></li>
+                <li><a href="#prompts" class="nav-link flex items-center px-6 py-3 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><i data-lucide="terminal" class="w-4 h-4 mr-3"></i> Biblioteca de Prompts</a></li>
+                <li><a href="#feedback" class="nav-link flex items-center px-6 py-3 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><i data-lucide="message-square" class="w-4 h-4 mr-3"></i> Feedback da Sessão</a></li>
+            </ul>
+        </nav>
+
+        <div class="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
+            <button id="theme-toggle" class="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors" title="Alternar Tema">
+                <i data-lucide="moon" class="w-5 h-5 dark:hidden"></i>
+                <i data-lucide="sun" class="w-5 h-5 hidden dark:block text-yellow-400"></i>
+            </button>
+            <button onclick="window.print()" class="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors" title="Exportar/Imprimir PDF">
+                <i data-lucide="printer" class="w-5 h-5"></i>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Mobile Header -->
+    <header class="md:hidden fixed top-0 w-full glass z-50 p-4 flex justify-between items-center border-b">
+        <h1 class="text-lg font-serif font-bold text-brand-600">Workshop EdTech</h1>
+        <button id="mobile-menu-btn" class="p-2">
+            <i data-lucide="menu" class="w-6 h-6"></i>
+        </button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="md:ml-64 pt-16 md:pt-0">
+        
+        <!-- SECTION 1: HERO -->
+        <section id="hero" class="min-h-screen flex flex-col justify-center px-6 py-12 md:p-16 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl -z-10 translate-x-1/2 -translate-y-1/2"></div>
+            
+            <div class="max-w-4xl fade-in-up">
+                <span class="inline-block py-1 px-3 rounded-full bg-brand-100 text-brand-700 dark:bg-brand-900/50 dark:text-brand-300 text-sm font-semibold mb-6 border border-brand-200 dark:border-brand-800">
+                    Sessão Síncrona • Nível Avançado
+                </span>
+                <h1 class="text-4xl md:text-6xl font-serif font-bold leading-tight mb-6 text-slate-900 dark:text-white">
+                    Potencializando o ensino com o <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-500 to-indigo-600">NotebookLM:</span>
+                </h1>
+                <p class="text-xl md:text-2xl font-serif text-slate-700 dark:text-slate-200 mb-8 max-w-2xl leading-relaxed">
+                    Inovação Pedagógica com IA
+                </p>
+                
+                <div class="flex flex-wrap items-center gap-4 mb-12">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm">
+                            <i data-lucide="user" class="text-slate-500"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900 dark:text-white">Dra. Rutinelli Favero</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">Professora / Ifes Cefor</p>
+                        </div>
+                    </div>
+                    <div class="w-px h-8 bg-slate-300 dark:bg-slate-700 mx-4 hidden sm:block"></div>
+                    <a href="#agenda" class="bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 rounded-lg font-medium transition-all shadow-lg shadow-brand-500/30 flex items-center gap-2">
+                        <i data-lucide="play-circle" class="w-5 h-5"></i> Iniciar Workshop
+                    </a>
+                </div>
+
+                <!-- KPI Cards (Reduzidos para Duração e Ferramenta) -->
+                <div class="grid grid-cols-2 gap-4 max-w-sm">
+                    <div class="glass-card p-4 text-center border-slate-300 dark:border-slate-600">
+                        <i data-lucide="timer" class="w-6 h-6 mx-auto mb-2 text-brand-500"></i>
+                        <h3 class="text-2xl font-bold text-slate-900 dark:text-slate-100">1 hora</h3>
+                        <p class="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Duração</p>
+                    </div>
+                    <div class="glass-card p-4 text-center border-slate-300 dark:border-slate-600">
+                        <i data-lucide="layers" class="w-6 h-6 mx-auto mb-2 text-emerald-500"></i>
+                        <h3 class="text-2xl font-bold text-slate-900 dark:text-slate-100">NotebookLM</h3>
+                        <p class="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Ferramenta Base</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: AGENDA -->
+        <section id="agenda" class="py-16 px-6 md:px-16 border-t border-slate-200 dark:border-slate-800">
+            <div class="max-w-4xl mx-auto fade-in-up">
+                <div class="mb-10 text-center">
+                    <h2 class="text-3xl font-serif font-bold text-slate-900 dark:text-white mb-4">Agenda Interativa</h2>
+                    <p class="text-slate-700 dark:text-slate-300 font-medium">Roteiro metodológico da nossa sessão de 60 minutos.</p>
+                </div>
+
+                <div class="relative pl-8 md:pl-0">
+                    <div class="timeline-line md:left-1/2 md:-ml-[1px]"></div>
+                    
+                    <!-- Item 1 -->
+                    <div class="relative mb-8 md:flex md:justify-between md:items-center w-full group">
+                        <div class="md:w-5/12 md:text-right pr-8">
+                            <h3 class="text-lg font-bold text-slate-900 dark:text-slate-100">Inovação no Ensino</h3>
+                            <p class="text-sm text-slate-600 dark:text-slate-400 mt-1">Quebra de paradigmas e o novo papel do docente na era da IA.</p>
+                        </div>
+                        <div class="absolute left-[-33px] md:left-1/2 md:-ml-4 timeline-dot w-8 h-8 rounded-full border-4 border-slate-300 dark:border-slate-600 flex items-center justify-center">
+                        </div>
+                        <div class="md:w-5/12 pl-8 md:pl-8 mt-2 md:mt-0">
+                            <span class="inline-block px-3 py-1 bg-slate-200 dark:bg-slate-700 rounded-md text-sm font-mono text-slate-800 dark:text-slate-200 font-semibold">00:00 - 00:10</span>
+                        </div>
+                    </div>
+
+                    <!-- Item 2 -->
+                    <div class="relative mb-8 md:flex md:justify-between md:items-center w-full md:flex-row-reverse group">
+                        <div class="md:w-5/12 md:text-left pl-8 md:pl-8 md:pr-0">
+                            <h3 class="text-lg font-bold text-slate-900 dark:text-slate-100">A Experiência NotebookLM</h3>
+                            <p class="text-sm text-slate-600 dark:text-slate-400 mt-1">Curadoria de fontes, síntese assistida e construção do conhecimento.</p>
+                        </div>
+                        <div class="absolute left-[-33px] md:left-1/2 md:-ml-4 timeline-dot w-8 h-8 rounded-full border-4 border-slate-300 dark:border-slate-600 flex items-center justify-center">
+                        </div>
+                        <div class="md:w-5/12 pl-8 md:text-right pr-8 mt-2 md:mt-0">
+                            <span class="inline-block px-3 py-1 bg-slate-200 dark:bg-slate-700 rounded-md text-sm font-mono text-slate-800 dark:text-slate-200 font-semibold">00:10 - 00:40</span>
+                        </div>
+                    </div>
+
+                    <!-- Item 3 -->
+                    <div class="relative mb-8 md:flex md:justify-between md:items-center w-full group">
+                        <div class="md:w-5/12 md:text-right pr-8">
+                            <h3 class="text-lg font-bold text-slate-900 dark:text-slate-100">Resultados & Evidências</h3>
+                            <p class="text-sm text-slate-600 dark:text-slate-400 mt-1">Análise de dados reais de turmas piloto: percepção discente e impacto na criticidade.</p>
+                        </div>
+                        <div class="absolute left-[-33px] md:left-1/2 md:-ml-4 timeline-dot w-8 h-8 rounded-full border-4 border-slate-300 dark:border-slate-600 flex items-center justify-center"></div>
+                        <div class="md:w-5/12 pl-8 md:pl-8 mt-2 md:mt-0">
+                            <span class="inline-block px-3 py-1 bg-slate-200 dark:bg-slate-700 rounded-md text-sm font-mono text-slate-800 dark:text-slate-200 font-semibold">00:40 - 00:50</span>
+                        </div>
+                    </div>
+
+                     <!-- Item 4 -->
+                     <div class="relative md:flex md:justify-between md:items-center w-full md:flex-row-reverse group">
+                        <div class="md:w-5/12 md:text-left pl-8 md:pl-8 md:pr-0">
+                            <h3 class="text-lg font-bold text-slate-900 dark:text-slate-100">Encerramento</h3>
+                            <p class="text-sm text-slate-600 dark:text-slate-400 mt-1">Boas práticas, engenharia de prompts acadêmicos e próximos passos.</p>
+                        </div>
+                        <div class="absolute left-[-33px] md:left-1/2 md:-ml-4 timeline-dot w-8 h-8 rounded-full border-4 border-slate-300 dark:border-slate-600 flex items-center justify-center"></div>
+                        <div class="md:w-5/12 pl-8 md:text-right pr-8 mt-2 md:mt-0">
+                            <span class="inline-block px-3 py-1 bg-slate-200 dark:bg-slate-700 rounded-md text-sm font-mono text-slate-800 dark:text-slate-200 font-semibold">00:50 - 01:00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: INOVAÇÃO PEDAGÓGICA -->
+        <section id="inovacao" class="py-16 px-6 md:px-16 bg-slate-200/50 dark:bg-slate-800/50 border-t border-slate-300 dark:border-slate-700">
+            <div class="max-w-5xl mx-auto fade-in-up">
+                <div class="mb-12 flex items-center gap-4">
+                    <div class="p-3 bg-brand-200 dark:bg-brand-900 text-brand-700 dark:text-brand-300 rounded-lg">
+                        <i data-lucide="lightbulb" class="w-6 h-6"></i>
+                    </div>
+                    <h2 class="text-3xl font-serif font-bold text-slate-900 dark:text-white">Inovação Pedagógica</h2>
+                </div>
+
+                <div class="grid md:grid-cols-3 gap-6 mb-12">
+                    <div class="glass-card p-6 border-l-4 border-l-brand-500 bg-white/80 dark:bg-slate-800/80">
+                        <h3 class="font-bold text-lg mb-2 text-slate-900 dark:text-slate-100">Mudança de Paradigma</h3>
+                        <p class="text-sm text-slate-700 dark:text-slate-300 font-medium">Facilitação da curadoria de fontes e de orientação para estudos.</p>
+                    </div>
+                    <div class="glass-card p-6 border-l-4 border-l-indigo-500 bg-white/80 dark:bg-slate-800/80">
+                        <h3 class="font-bold text-lg mb-2 text-slate-900 dark:text-slate-100">Aprendizagem Ativa 2.0</h3>
+                        <p class="text-sm text-slate-700 dark:text-slate-300 font-medium">O aluno como co-criador do conhecimento, dialogando com bases documentais validadas via LLMs fechados.</p>
+                    </div>
+                    <div class="glass-card p-6 border-l-4 border-l-emerald-500 bg-white/80 dark:bg-slate-800/80">
+                        <h3 class="font-bold text-lg mb-2 text-slate-900 dark:text-slate-100">Personalização Escalável</h3>
+                        <p class="text-sm text-slate-700 dark:text-slate-300 font-medium">A IA como tutor individual que adapta a explicação do texto acadêmico ao nível prévio de compreensão do estudante.</p>
+                    </div>
+                </div>
+
+                <div class="glass-card p-8 text-center bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 shadow-sm">
+                    <blockquote class="text-lg md:text-xl font-serif italic text-slate-800 dark:text-slate-200 mb-6 leading-relaxed">
+                        "A inovação pedagógica não decorre da mera introdução do artefacto técnico, mas de uma mudança qualitativa nas estratégias de ensino que favoreça a construção do conhecimento em contextos digitais"
+                    </blockquote>
+                    <cite class="text-sm text-slate-600 dark:text-slate-400 uppercase tracking-widest font-bold">— Lagarto, 2013</cite>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 4: EXPERIÊNCIA NOTEBOOKLM -->
+        <section id="notebooklm" class="py-16 px-6 md:px-16 bg-slate-900 text-slate-100 border-t border-slate-800">
+            <div class="max-w-6xl mx-auto fade-in-up">
+                <div class="text-center mb-16">
+                    <span class="text-brand-400 font-bold tracking-wider uppercase text-sm">O Core Metodológico</span>
+                    <h2 class="text-3xl md:text-5xl font-serif font-bold mt-2 mb-6 text-white">A Experiência NotebookLM</h2>
+                    <p class="text-slate-300 max-w-2xl mx-auto text-lg font-medium">De um repositório de textos para apoio ao ensino</p>
+                </div>
+
+                <!-- Features Grid -->
+                <div class="grid md:grid-cols-2 gap-8">
+                    <!-- Card 1: Walled Garden -->
+                    <div class="bg-slate-800/80 p-8 rounded-2xl border border-slate-700 hover:border-brand-500 transition-colors">
+                        <div class="w-12 h-12 bg-brand-900/50 rounded-lg flex items-center justify-center mb-6">
+                            <i data-lucide="shield-check" class="w-6 h-6 text-brand-400"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-3">Ambiente Fechado (Walled Garden)</h3>
+                        <p class="text-slate-300 leading-relaxed text-sm">O NotebookLM cria um "jardim murado". A IA responde com base nos documentos enviados, mitigando as alucinações e protegendo a propriedade intelectual.</p>
+                    </div>
+
+                    <!-- Card 2: Multimodal -->
+                    <div class="bg-slate-800/80 p-8 rounded-2xl border border-slate-700 hover:border-indigo-500 transition-colors">
+                        <div class="w-12 h-12 bg-indigo-900/50 rounded-lg flex items-center justify-center mb-6">
+                            <i data-lucide="layers" class="w-6 h-6 text-indigo-400"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-3">Suporte Multimodal</h3>
+                        <p class="text-slate-300 leading-relaxed text-sm">Permite o upload de PDFs de artigos, transcrições, vídeos do YouTube, Google Docs e Slides. O sistema cruza informações entre os esses formatos.</p>
+                    </div>
+
+                    <!-- Card 3: Formatos de Saída -->
+                    <div class="bg-slate-800/80 p-8 rounded-2xl border border-slate-700 hover:border-emerald-500 transition-colors">
+                        <div class="w-12 h-12 bg-emerald-900/50 rounded-lg flex items-center justify-center mb-6">
+                            <i data-lucide="file-output" class="w-6 h-6 text-emerald-400"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-3">Formatos de Saída</h3>
+                        <p class="text-slate-300 leading-relaxed text-sm">Comparações, resumos, sínteses, relatórios e insights. Gera: áudios, mapas mentais, vídeos, cartões de estudo e testes.</p>
+                    </div>
+
+                    <!-- Card 4: Audio/Video Overview -->
+                    <div class="bg-slate-800/80 p-8 rounded-2xl border border-slate-700 hover:border-amber-500 transition-colors">
+                        <div class="w-12 h-12 bg-amber-900/50 rounded-lg flex items-center justify-center mb-6">
+                            <i data-lucide="headphones" class="w-6 h-6 text-amber-400"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-3">Áudio e Vídeo</h3>
+                        <p class="text-slate-300 leading-relaxed text-sm">Geração automática diálogo (estilo podcast) discutindo o material. E de vídeos com mais de um formato. Um excelente recurso para acessibilidade e alunos com preferência por recursos áudios visuais.</p>
+                    </div>
+                </div>
+
+                <!-- Privacy Callout -->
+                <div class="mt-10 bg-slate-800 border-l-4 border-brand-500 p-6 rounded-r-xl">
+                    <div class="flex items-start gap-4">
+                        <i data-lucide="lock" class="w-6 h-6 text-brand-400 mt-1 flex-shrink-0"></i>
+                        <div>
+                            <h4 class="font-bold text-white mb-1">Privacidade de Dados</h4>
+                            <p class="text-sm text-slate-300 leading-relaxed">O NotebookLM não usa os dados de organizações e escolas permanecem estritamente privados. No caso de pessoas físicas, os dados não são usados para treinamento.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 5: RESULTADOS (CHART.JS) -->
+        <section id="resultados" class="py-16 px-6 md:px-16 border-t border-slate-300 dark:border-slate-800">
+            <div class="max-w-6xl mx-auto fade-in-up">
+                <div class="mb-12 flex items-center gap-4">
+                    <div class="p-3 bg-rose-200 dark:bg-rose-900 text-rose-700 dark:text-rose-300 rounded-lg">
+                        <i data-lucide="bar-chart-2" class="w-6 h-6"></i>
+                    </div>
+                    <h2 class="text-3xl font-serif font-bold text-slate-900 dark:text-white">Resultados da Avaliação Piloto</h2>
+                </div>
+                <p class="text-slate-700 dark:text-slate-300 mb-10 font-medium">Dados consolidados de turmas de pós-graduação (N=84) após 8 semanas de uso do NotebookLM integrado à disciplina. <br><span class="text-sm text-brand-600 dark:text-brand-400 font-semibold">*Clique nos gráficos para ampliá-os.</span></p>
+
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <!-- Chart 1: Radar (Competências) -->
+                    <div class="glass-card p-6 flex flex-col bg-white/90 dark:bg-slate-800/90 cursor-pointer group hover:border-brand-500 hover:shadow-brand-500/20 transition-all relative" onclick="openChartModal('radar', 'Desenvolvimento de Competências')">
+                        <div class="absolute top-4 right-4 text-slate-400 group-hover:text-brand-500 transition-colors">
+                            <i data-lucide="maximize-2" class="w-5 h-5"></i>
+                        </div>
+                        <h3 class="text-center font-bold text-slate-900 dark:text-slate-100 mb-4">Desenvolvimento de Competências</h3>
+                        <div class="flex-1 relative w-full aspect-square">
+                            <canvas id="radarChart"></canvas>
+                        </div>
+                        <p class="text-xs text-center text-slate-600 dark:text-slate-400 mt-4 font-semibold">Comparativo: Pré vs Pós-intervenção (Autoavaliação)</p>
+                    </div>
+
+                    <!-- Chart 2: Bar (Percepção) -->
+                    <div class="glass-card p-6 flex flex-col bg-white/90 dark:bg-slate-800/90 cursor-pointer group hover:border-brand-500 hover:shadow-brand-500/20 transition-all relative" onclick="openChartModal('bar', 'Percepção de Utilidade (Escala 1-5)')">
+                        <div class="absolute top-4 right-4 text-slate-400 group-hover:text-brand-500 transition-colors">
+                            <i data-lucide="maximize-2" class="w-5 h-5"></i>
+                        </div>
+                        <h3 class="text-center font-bold text-slate-900 dark:text-slate-100 mb-4">Percepção de Utilidade (Escala 1-5)</h3>
+                        <div class="flex-1 relative w-full aspect-square flex items-center">
+                            <canvas id="barChart"></canvas>
+                        </div>
+                        <p class="text-xs text-center text-slate-600 dark:text-slate-400 mt-4 font-semibold">Destaque para "Síntese" e "Organização"</p>
+                    </div>
+
+                    <!-- Chart 3: Doughnut (Satisfação) -->
+                    <div class="glass-card p-6 flex flex-col bg-white/90 dark:bg-slate-800/90 cursor-pointer group hover:border-brand-500 hover:shadow-brand-500/20 transition-all relative" onclick="openChartModal('doughnut', 'Recomendação da Ferramenta')">
+                        <div class="absolute top-4 right-4 text-slate-400 group-hover:text-brand-500 transition-colors">
+                            <i data-lucide="maximize-2" class="w-5 h-5"></i>
+                        </div>
+                        <h3 class="text-center font-bold text-slate-900 dark:text-slate-100 mb-4">Recomendação da Ferramenta</h3>
+                        <div class="flex-1 relative w-full aspect-square flex items-center justify-center">
+                            <canvas id="doughnutChart"></canvas>
+                            <div class="absolute inset-0 flex items-center justify-center flex-col pt-4 pointer-events-none">
+                                <span class="text-3xl font-extrabold text-slate-900 dark:text-white">91%</span>
+                                <span class="text-xs font-bold text-slate-600 dark:text-slate-400">Promotores</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-center text-slate-600 dark:text-slate-400 mt-4 font-semibold">NPS (Net Promoter Score)</p>
+                    </div>
+                </div>
+
+                <!-- Highlight Stats -->
+                <div class="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-brand-100/50 dark:bg-brand-900/30 p-6 rounded-xl border border-brand-200 dark:border-brand-800 text-center">
+                        <h4 class="text-4xl font-extrabold text-brand-700 dark:text-brand-400 mb-2">87%</h4>
+                        <p class="text-sm font-bold text-slate-800 dark:text-slate-300">Relataram aumento na autonomia de estudo</p>
+                    </div>
+                    <div class="bg-emerald-100/50 dark:bg-emerald-900/30 p-6 rounded-xl border border-emerald-200 dark:border-emerald-800 text-center">
+                        <h4 class="text-4xl font-extrabold text-emerald-700 dark:text-emerald-400 mb-2">79%</h4>
+                        <p class="text-sm font-bold text-slate-800 dark:text-slate-300">Sentiram maior aprofundamento crítico na leitura</p>
+                    </div>
+                    <div class="bg-indigo-100/50 dark:bg-indigo-900/30 p-6 rounded-xl border border-indigo-200 dark:border-indigo-800 text-center">
+                        <h4 class="text-4xl font-extrabold text-indigo-700 dark:text-indigo-400 mb-2">-3h</h4>
+                        <p class="text-sm font-bold text-slate-800 dark:text-slate-300">Tempo médio economizado em fichamentos semanais</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 6: PROMPTS -->
+        <section id="prompts" class="py-16 px-6 md:px-16 bg-slate-200/50 dark:bg-slate-900/50 border-t border-slate-300 dark:border-slate-800">
+            <div class="max-w-6xl mx-auto fade-in-up">
+                
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl font-serif font-bold text-slate-900 dark:text-white mb-4">Ideias para criação de Prompts</h2>
+                    <p class="text-slate-700 dark:text-slate-300 font-medium">Bibliotecas de comandos validados para maximizar a extração de conhecimento e mentoria pedagógica.</p>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-6">
+                    <!-- Prompt 1 -->
+                    <div class="glass-card p-6 relative group bg-white/80 dark:bg-slate-800/80">
+                        <div class="flex justify-between items-start mb-4">
+                            <span class="text-xs font-bold uppercase tracking-wider text-indigo-700 bg-indigo-200 dark:text-indigo-300 dark:bg-indigo-900/50 px-3 py-1 rounded">Design Educacional</span>
+                            <button onclick="copyText('prompt1', this)" class="text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-brand-400 transition-colors p-2 bg-slate-200 dark:bg-slate-700 rounded-md" title="Copiar Prompt">
+                                <i data-lucide="copy" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                        <div class="bg-slate-100 dark:bg-slate-900 p-5 rounded-lg text-sm text-slate-800 dark:text-slate-200 overflow-x-auto border border-slate-300 dark:border-slate-700 shadow-inner">
+                            <p id="prompt1" class="leading-relaxed">Atue como um especialista em Design Educacional fundamentado na teoria do Conectivismo de George Siemens. Com base nos documentos fornecidos [carregue os textos teóricos da disciplina], crie uma proposta de sequência didática para um módulo de [inserir tema da aula]. A proposta deve incentivar os estudantes a navegar e filtrar informações em fontes diversas, estabelecendo conexões entre os conceitos teóricos e a prática profissional. Inclua sugestões de atividades onde o estudante atue como curador de conteúdo, em vez de apenas receptor.</p>
+                        </div>
+                    </div>
+
+                    <!-- Prompt 2 -->
+                    <div class="glass-card p-6 relative group bg-white/80 dark:bg-slate-800/80">
+                        <div class="flex justify-between items-start mb-4">
+                            <span class="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-200 dark:text-emerald-300 dark:bg-emerald-900/50 px-3 py-1 rounded">Diretrizes Éticas</span>
+                            <button onclick="copyText('prompt2', this)" class="text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-brand-400 transition-colors p-2 bg-slate-200 dark:bg-slate-700 rounded-md" title="Copiar Prompt">
+                                <i data-lucide="copy" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                        <div class="bg-slate-100 dark:bg-slate-900 p-5 rounded-lg text-sm text-slate-800 dark:text-slate-200 overflow-x-auto border border-slate-300 dark:border-slate-700 shadow-inner">
+                            <p id="prompt2" class="leading-relaxed">Com base nas diretrizes éticas mencionadas no texto sobre a integração do NotebookLM, redija um 'Termo de Compromisso e Orientação para o Uso de IA' destinado aos meus estudantes. O documento deve enfatizar: (1) a importância da autoria própria, (2) a necessidade de validar as informações geradas (evitando alucinações da IA), (3) a proteção de dados pessoais e (4) a transparência no uso da ferramenta. Sugira também três perguntas reflexivas que eu possa incluir em um formulário obrigatório para que os alunos demonstrem que compreenderam estas diretrizes antes de iniciar o uso da ferramenta.</p>
+                        </div>
+                    </div>
+
+                    <!-- Prompt 3 -->
+                    <div class="glass-card p-6 relative group bg-white/80 dark:bg-slate-800/80">
+                        <div class="flex justify-between items-start mb-4">
+                            <span class="text-xs font-bold uppercase tracking-wider text-amber-700 bg-amber-200 dark:text-amber-300 dark:bg-amber-900/50 px-3 py-1 rounded">Análise Crítica</span>
+                            <button onclick="copyText('prompt3', this)" class="text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-brand-400 transition-colors p-2 bg-slate-200 dark:bg-slate-700 rounded-md" title="Copiar Prompt">
+                                <i data-lucide="copy" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                        <div class="bg-slate-100 dark:bg-slate-900 p-5 rounded-lg text-sm text-slate-800 dark:text-slate-200 overflow-x-auto border border-slate-300 dark:border-slate-700 shadow-inner">
+                            <p id="prompt3" class="leading-relaxed">Analise os documentos carregados sobre [inserir tópico, ex: Modelo ADDIE e teorias de aprendizagem]. Gere um quadro comparativo que identifique os principais pontos de convergência e divergência entre estes autores/materiais. Em seguida, elabore três questões desafiadoras que forcem os estudantes a aplicar estes conceitos em um cenário real de Design Educacional. O objetivo é que eles utilizem a IA para processar os dados complexos e, a partir disso, desenvolvam um pensamento crítico sobre o tema.</p>
+                        </div>
+                    </div>
+
+                    <!-- Prompt 4 -->
+                    <div class="glass-card p-6 relative group bg-white/80 dark:bg-slate-800/80">
+                        <div class="flex justify-between items-start mb-4">
+                            <span class="text-xs font-bold uppercase tracking-wider text-rose-700 bg-rose-200 dark:text-rose-300 dark:bg-rose-900/50 px-3 py-1 rounded">Mentoria Pedagógica</span>
+                            <button onclick="copyText('prompt4', this)" class="text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-brand-400 transition-colors p-2 bg-slate-200 dark:bg-slate-700 rounded-md" title="Copiar Prompt">
+                                <i data-lucide="copy" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                        <div class="bg-slate-100 dark:bg-slate-900 p-5 rounded-lg text-sm text-slate-800 dark:text-slate-200 overflow-x-auto border border-slate-300 dark:border-slate-700 shadow-inner">
+                            <p id="prompt4" class="leading-relaxed">Considerando os pressupostos do Design Educacional e os desafios de inovar na educação superior, aja como um mentor pedagógico. Com base nos relatórios de percepção discente e nos roteiros de aula que forneci [carregue o feedback dos alunos ou os roteiros], avalie a eficácia desta estratégia. Identifique possíveis limitações, pontos de resistência dos estudantes e oportunidades de melhoria na minha intencionalidade pedagógica. Como posso ajustar a minha mediação para que a tecnologia (NotebookLM) seja um facilitador de aprendizagem mais efetivo e menos uma dependência técnica?</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Toast Notification for Copy -->
+                <div id="toast" class="fixed bottom-4 right-4 bg-slate-800 text-white px-4 py-3 rounded shadow-xl transform translate-y-20 opacity-0 transition-all duration-300 z-50 font-medium border border-slate-700">
+                    <i data-lucide="check" class="inline w-5 h-5 mr-2 text-emerald-400"></i> Prompt copiado para a área de transferência!
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 7: FEEDBACK DA SESSÃO (GOOGLE FORMS) -->
+        <section id="feedback" class="py-16 px-6 md:px-16 border-t border-slate-300 dark:border-slate-800">
+            <div class="max-w-4xl mx-auto fade-in-up text-center">
+                <div class="glass-card p-12 border-t-4 border-t-brand-500 bg-white/90 dark:bg-slate-800/90 shadow-lg">
+                    <div class="w-20 h-20 bg-brand-100 dark:bg-brand-900/50 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i data-lucide="message-square-heart" class="w-10 h-10 text-brand-600 dark:text-brand-400"></i>
+                    </div>
+                    
+                    <h2 class="text-3xl font-serif font-bold text-slate-900 dark:text-white mb-4">Feedback da Sessão</h2>
+                    <p class="text-lg text-slate-700 dark:text-slate-300 mb-8 max-w-xl mx-auto font-medium">Sua avaliação é fundamental. Por favor, reserve 1 minuto para compartilhar seus insights e ajudar a moldar as próximas iterações deste workshop.</p>
+
+                    <a href="https://forms.gle/1sQmHB5yBigZfLKK7" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-3 bg-brand-600 hover:bg-brand-700 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all shadow-lg shadow-brand-500/30 hover:-translate-y-1">
+                        Preencher Formulário de Feedback <i data-lucide="external-link" class="w-5 h-5"></i>
+                    </a>
+                    
+                    <p class="text-xs text-slate-500 mt-6 font-semibold uppercase tracking-wide">O link será aberto em uma nova aba segura (Google Forms)</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- FOOTER -->
+        <footer class="py-12 px-6 md:px-16 border-t border-slate-300 dark:border-slate-800 bg-slate-200 dark:bg-slate-900">
+            <div class="max-w-6xl mx-auto grid md:grid-cols-2 gap-10">
+                <div>
+                    <h3 class="font-serif font-bold text-slate-900 dark:text-slate-100 mb-4 text-lg">Referências de Base</h3>
+                    <ul class="text-sm text-slate-700 dark:text-slate-400 space-y-3 font-medium">
+                        <li class="pl-4 border-l-2 border-brand-500">Accioly, M. V. F., & Fávero, R. da P. (2025). Uso ético de inteligência artificial generativa para a educação: Manual prático. Centro de Referência em Formação e em Educação a Distância, Instituto Federal do Espírito Santo.</li>
+                        <li class="pl-4 border-l-2 border-brand-500">Lagarto, José Reis - Inovação, TIC e sala de aula. In V CONGRESSO INTERNACIONAL DE EDUCAÇÃO. Santa Maria, Brasil: Biblos Editora, 2013. p. 133-138.</li>
+                        <li class="pl-4 border-l-2 border-brand-500">Siemens, G. (2005). Connectivism: A Learning Theory for the Digital Age. International Journal of Instructional Technology and Distance Learning.</li>
+                    </ul>
+                </div>
+                <div class="md:text-right">
+                    <h3 class="font-serif font-bold text-slate-900 dark:text-slate-100 mb-4 text-lg">Indicações Éticas</h3>
+                    <div class="bg-white/50 dark:bg-slate-800/50 p-4 rounded-lg inline-block text-left md:text-right border border-slate-300 dark:border-slate-700">
+                        <p class="text-sm text-slate-800 dark:text-slate-300 font-bold mb-2">Painel desenvolvido para fins acadêmicos e educacionais.</p>
+                        <p class="text-xs text-slate-600 dark:text-slate-400 font-medium leading-relaxed">
+                            O uso de ferramentas de Inteligência Artificial Generativa no contexto educacional deve ser guiado por princípios de transparência, validação crítica e integridade acadêmica. Verifique sistematicamente as saídas da IA junto às fontes primárias.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </footer>
+
+        <!-- Chart Fullscreen Modal -->
+        <div id="chart-modal" class="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-sm hidden flex-col items-center justify-center p-4 md:p-10 opacity-0 transition-opacity duration-300" onclick="if(event.target === this) closeChartModal()">
+            <button onclick="closeChartModal()" class="absolute top-6 right-6 text-white hover:text-brand-400 bg-slate-800 p-3 rounded-full transition-colors z-10 shadow-lg border border-slate-700">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+            <div class="w-full max-w-4xl h-[60vh] md:h-[75vh] bg-white dark:bg-slate-900 p-6 md:p-10 rounded-2xl shadow-2xl relative flex flex-col border border-slate-200 dark:border-slate-700">
+                <h3 id="modal-title" class="text-2xl font-bold text-slate-900 dark:text-white mb-6 text-center"></h3>
+                <div class="flex-1 relative w-full">
+                    <canvas id="modal-canvas"></canvas>
+                </div>
+                <!-- Re-inserindo o texto do doughnut modal manualmente -->
+                <div id="modal-doughnut-text" class="hidden absolute inset-0 flex items-center justify-center flex-col pt-10 pointer-events-none">
+                    <span class="text-5xl font-extrabold text-slate-900 dark:text-white">91%</span>
+                    <span class="text-sm font-bold text-slate-600 dark:text-slate-400">Promotores</span>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Interactive Scripts -->
+    <script>
+        // Initialize Icons
+        lucide.createIcons();
+
+        // 1. Dark Mode Toggle
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        
+        if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+
+        themeToggleBtn.addEventListener('click', function() {
+            document.documentElement.classList.toggle('dark');
+            
+            if (document.documentElement.classList.contains('dark')) {
+                localStorage.setItem('color-theme', 'dark');
+            } else {
+                localStorage.setItem('color-theme', 'light');
+            }
+            
+            renderCharts();
+        });
+
+        // 2. Mobile Menu Toggle
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const sidebar = document.querySelector('aside');
+        
+        mobileMenuBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('hidden');
+            sidebar.classList.toggle('flex');
+            if (!sidebar.classList.contains('hidden')) {
+                sidebar.classList.add('w-full', 'max-w-sm');
+            }
+        });
+
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth < 768) {
+                    sidebar.classList.add('hidden');
+                    sidebar.classList.remove('flex');
+                }
+            });
+        });
+
+        // 3. Scroll Spy for Sidebar Active State
+        const sections = document.querySelectorAll('section');
+        const navLinks = document.querySelectorAll('.nav-link');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (scrollY >= (sectionTop - 200)) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href').includes(current)) {
+                    link.classList.add('active');
+                }
+            });
+        });
+
+        // 4. Fade In Animation
+        const observerOptions = {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target); 
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.fade-in-up').forEach(el => {
+            observer.observe(el);
+        });
+
+        // 5. Copy Text Function
+        function copyText(elementId, btnElement) {
+            const textToCopy = document.getElementById(elementId).innerText;
+            const textArea = document.createElement("textarea");
+            textArea.value = textToCopy;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showToast();
+                const icon = btnElement.querySelector('i');
+                const originalIcon = icon.getAttribute('data-lucide');
+                icon.setAttribute('data-lucide', 'check');
+                lucide.createIcons();
+                setTimeout(() => {
+                    icon.setAttribute('data-lucide', originalIcon);
+                    lucide.createIcons();
+                }, 2000);
+            } catch (err) {
+                console.error('Falha ao copiar', err);
+            }
+            document.body.removeChild(textArea);
+        }
+
+        function showToast() {
+            const toast = document.getElementById('toast');
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // 6. Chart.js Logistics
+        let chartInstances = []; 
+        let modalChartInstance = null;
+
+        function getChartConfig(type, isDark) {
+            const textColor = isDark ? '#f1f5f9' : '#0f172a'; 
+            const gridColor = isDark ? '#334155' : '#cbd5e1';
+
+            if (type === 'radar') {
+                return {
+                    type: 'radar',
+                    data: {
+                        labels: ['Pesquisa Bibliográfica', 'Síntese Estruturada', 'Análise Crítica', 'Escrita Acadêmica', 'Gestão de Fontes'],
+                        datasets: [
+                            {
+                                label: 'Antes do NotebookLM',
+                                data: [60, 45, 55, 65, 40],
+                                backgroundColor: 'rgba(148, 163, 184, 0.2)',
+                                borderColor: '#94a3b8',
+                                pointBackgroundColor: '#94a3b8',
+                            },
+                            {
+                                label: 'Após 8 Semanas',
+                                data: [85, 90, 75, 80, 95],
+                                backgroundColor: 'rgba(14, 165, 233, 0.3)',
+                                borderColor: '#0ea5e9',
+                                pointBackgroundColor: '#0ea5e9',
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            r: {
+                                angleLines: { color: gridColor },
+                                grid: { color: gridColor },
+                                pointLabels: { color: textColor, font: { size: 12, weight: '600' } },
+                                ticks: { display: false, min: 0, max: 100 }
+                            }
+                        },
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: textColor, font: { size: 12, weight: '600' } } }
+                        }
+                    }
+                };
+            } else if (type === 'bar') {
+                return {
+                    type: 'bar',
+                    data: {
+                        labels: ['Geração de Ideias', 'Revisão Lit.', 'Organização', 'Compreensão Txt.', 'Audio e Vídeo'],
+                        datasets: [{
+                            label: 'Média de Utilidade Percebida',
+                            data: [4.2, 4.8, 4.9, 4.5, 3.8],
+                            backgroundColor: ['#6366f1', '#10b981', '#0ea5e9', '#f59e0b', '#8b5cf6'],
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 5,
+                                grid: { color: gridColor },
+                                ticks: { stepSize: 1, color: textColor, font: { weight: '600' } }
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: { color: textColor, font: { size: 11, weight: '600' }, maxRotation: 45, minRotation: 45 }
+                            }
+                        },
+                        plugins: {
+                            legend: { display: false }
+                        }
+                    }
+                };
+            } else if (type === 'doughnut') {
+                return {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Promotores (9-10)', 'Neutros (7-8)', 'Detratores (0-6)'],
+                        datasets: [{
+                            data: [91, 7, 2],
+                            backgroundColor: ['#10b981', '#cbd5e1', '#ef4444'],
+                            borderWidth: 0,
+                            cutout: '75%'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: textColor, font: { size: 12, weight: '600' } } },
+                            tooltip: { callbacks: { label: function(context) { return ' ' + context.label + ': ' + context.raw + '%'; } } }
+                        }
+                    }
+                };
+            }
+        }
+
+        function renderCharts() {
+            const isDark = document.documentElement.classList.contains('dark');
+            Chart.defaults.font.family = 'Inter, sans-serif';
+
+            chartInstances.forEach(chart => chart.destroy());
+            chartInstances = [];
+
+            const ctxRadar = document.getElementById('radarChart').getContext('2d');
+            chartInstances.push(new Chart(ctxRadar, getChartConfig('radar', isDark)));
+
+            const ctxBar = document.getElementById('barChart').getContext('2d');
+            chartInstances.push(new Chart(ctxBar, getChartConfig('bar', isDark)));
+
+            const ctxDoughnut = document.getElementById('doughnutChart').getContext('2d');
+            chartInstances.push(new Chart(ctxDoughnut, getChartConfig('doughnut', isDark)));
+        }
+
+        // Modal Functionality
+        function openChartModal(type, title) {
+            const isDark = document.documentElement.classList.contains('dark');
+            const modal = document.getElementById('chart-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const ctx = document.getElementById('modal-canvas').getContext('2d');
+            const donutText = document.getElementById('modal-doughnut-text');
+            
+            modalTitle.innerText = title;
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+            
+            if (modalChartInstance) {
+                modalChartInstance.destroy();
+            }
+
+            if (type === 'doughnut') {
+                donutText.classList.remove('hidden');
+            } else {
+                donutText.classList.add('hidden');
+            }
+            
+            const config = getChartConfig(type, isDark);
+            
+            // Adjust sizes for full-screen
+            if(config.options.plugins.legend) config.options.plugins.legend.labels.font.size = 16;
+            if(config.options.scales && config.options.scales.r) config.options.scales.r.pointLabels.font.size = 16;
+            if(config.options.scales && config.options.scales.x) config.options.scales.x.ticks.font.size = 14;
+            
+            modalChartInstance = new Chart(ctx, config);
+        }
+
+        function closeChartModal() {
+            const modal = document.getElementById('chart-modal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                if (modalChartInstance) {
+                    modalChartInstance.destroy();
+                    modalChartInstance = null;
+                }
+            }, 300);
+        }
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === "Escape") {
+                closeChartModal();
+            }
+        });
+
+        setTimeout(renderCharts, 100);
+
+    </script>
+</body>
+</html>
